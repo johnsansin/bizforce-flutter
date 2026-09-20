@@ -79,9 +79,7 @@ class _EventsScreenState extends State<EventsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Events'),
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-        ],
+        actions: [],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

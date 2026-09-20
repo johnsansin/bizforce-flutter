@@ -74,7 +74,6 @@ class _TasksScreenState extends State<TasksScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tasks'),
-        actions: [IconButton(icon: const Icon(Icons.search), onPressed: () {})],
       ),
       body: Column(
         children: [
@@ -350,9 +349,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tasks'),
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-        ],
+        actions: [],
       ),
       body: Column(
         children: [
@@ -404,7 +401,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     ],
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
               ],
             ),
           ),

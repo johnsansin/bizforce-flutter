@@ -42,10 +42,7 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(record.module),
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
-        ],
+        actions: [],
       ),
       body: Column(
         children: [

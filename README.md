@@ -7,8 +7,7 @@ targets all modern phone sizes and works in light and dark mode.
 ## What's implemented
 
 - **Auth** — login (email/password), "Keep me signed in", Forgot password,
-  social sign-in row (Google / Apple / Office 365), Sign in with OTP, Sign in
-  with SAML, offline sign-in state.
+  secure email/password authentication backed by the production API.
 - **Home shell** — bottom navigation (Dashboard / Leads / Tasks / Calendar / More)
   and a module drawer with all groups: Favourites, SALES, MARKETING, Projects,
   INVENTORY, HELP DESK, Others (+ user footer and Sign Out).
@@ -26,7 +25,7 @@ targets all modern phone sizes and works in light and dark mode.
   - task timelog with Pause/Resume/Stop,
   - quote list with printable-style preview tab.
 - **Settings** — push notifications, sync/offline storage, auto-sync interval,
-  dark mode, call logging, **API Base URL editor**, app info, legal center.
+  dark mode, call logging, app info, legal center.
 - **Plus** — Inbox welcome, Actions hub, Map screen, Help center, compose email.
 
 ## Project layout
@@ -35,8 +34,8 @@ targets all modern phone sizes and works in light and dark mode.
 lib/
   main.dart                    App entry + theme + provider
   core/                        colors, config, theme, formatters
-  data/                        models, mock data, ApiService (HTTP layer)
-  state/app_state.dart         auth/session/dark mode/base URL state
+  data/                        models and ApiService (HTTP layer)
+  state/app_state.dart         auth/session/dark mode state
   widgets/                     shared widgets (detail tabs, forms, chips…)
   screens/                     one file per screen/flow
 ss/                            reference screenshots you provided
@@ -57,25 +56,9 @@ flutter build appbundle --release            # Android (Play Store)
 flutter build ipa --release                  # iOS (requires macOS + Xcode)
 ```
 
-## Wiring your backend
+## Backend
 
-The app ships with realistic mock data behind a clean service layer. To plug
-in your CRM API:
-
-1. Put your endpoint in `lib/core/app_config.dart`
-   (`apiBaseUrl`), or set it at runtime via **Settings → Connection → API Base URL**.
-2. The HTTP wrapper `ApiService` (`lib/data/api_service.dart`) already handles
-   GET/POST/PUT/DELETE, JSON, auth bearer tokens and errors.
-3. Replace the `MockData.*()` calls in each screen with repository methods that
-   call `ApiService`. Each list screen takes a `records: () => ...` function and
-   a `tabFactory` — swap the mock call for a real fetch and state will update.
-
-Example repository call:
-
-```dart
-final list = await appState.api.request('/modules/Leads',
-    method: ApiMethod.get, query: {'view': 'MyLeads'});
-```
-
-Send the base URL and your endpoint list when ready and I'll wire every module
-to the real API.
+The app uses the fixed production endpoint `https://bizforce-crm.online/api`.
+The endpoint is intentionally not displayed or editable in Settings.
+`ApiService` handles authenticated GET/POST/PUT/PATCH/DELETE requests, JSON,
+bearer tokens, timeouts, errors, and empty API responses.

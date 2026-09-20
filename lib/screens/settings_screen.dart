@@ -5,6 +5,7 @@ import '../core/app_config.dart';
 import '../data/api_service.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
+import 'module_list_screen.dart';
 
 /// Settings matching the reference: Notification, Sync, Offline Storage,
 /// Dark Mode, Call Logging, App Info and Legal. Sync + toggles talk to the
@@ -169,9 +170,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     endIndent: 16,
                     color: Theme.of(context).dividerColor),
                 _row(
-                    title: _lastSynced ?? 'Last synced a few seconds ago',
-                    caption: 'Last sync',
-                    onTap: () {}),
+                  title: _lastSynced ?? 'Last synced a few seconds ago',
+                  caption: 'Last sync',
+                ),
               ],
             ),
           ),
@@ -304,7 +305,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Policy & Legal Center',
                       style: TextStyle(fontSize: 15)),
                   trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: () {},
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ModuleListScreen(
+                              title: 'Policy & Legal Center',
+                              module: 'Policies'))),
                 ),
               ],
             ),

@@ -26,8 +26,7 @@ class CreateField {
 /// Details / Description Details / Profile Picture) and labeled fields.
 ///
 /// `onSave` is invoked with the collected values. When a backend is
-/// configured the new record is POSTed to `/modules/<module>`; otherwise it
-/// falls back to a mock save so the flow demos end-to-end.
+/// configured the new record is posted to the module endpoint.
 class CreateRecordScreen extends StatefulWidget {
   final String module;
   final List<CreateField> fields;
@@ -64,9 +63,6 @@ class _CreateRecordScreenState extends State<CreateRecordScreen> {
     _select = {};
     _dates = {};
     for (final f in widget.fields) {
-      if (f.type == FieldType.date || f.type == FieldType.phone) {
-        // placeholder
-      }
       _text[f.label] = TextEditingController(text: f.initial ?? '');
       if (f.options != null && f.options!.isNotEmpty && f.initial != null)
         _select[f.label] = f.initial!;

@@ -18,6 +18,7 @@ import 'tasks_screen.dart';
 import 'documents_screen.dart';
 import 'chat_screen.dart';
 import 'search_screen.dart';
+import 'scan_business_card.dart';
 
 /// Root shell: bottom navigation (Dashboard / Leads / Tasks / Calendar /
 /// More) and the hamburger drawer that reveals every CRM module in
@@ -78,7 +79,8 @@ class _HomeShellState extends State<HomeShell> {
         Navigator.push(
             context, MaterialPageRoute(builder: (_) => const ChatScreen()));
       case 'businesscardscanner':
-        break;
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const ScanBusinessCardScreen()));
       default:
         Navigator.push(
           context,

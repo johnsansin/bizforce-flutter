@@ -97,7 +97,6 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
                 icon: const Icon(Icons.search),
                 onPressed: () =>
                     FocusScope.of(context).requestFocus(FocusNode())),
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
         ],
       ),
       body: Column(

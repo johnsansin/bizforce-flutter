@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'module_create_screen.dart';
 import '../core/app_colors.dart';
 import '../data/api_service.dart';
 import '../data/models.dart';
@@ -60,7 +61,6 @@ class _QuotesScreenState extends State<QuotesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quotes'),
-        actions: [IconButton(icon: const Icon(Icons.search), onPressed: () {})],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -112,7 +112,29 @@ class _QuotesScreenState extends State<QuotesScreen> {
                       ),
                     ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () async {
+          final created = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      const CreateRecordScreen(module: 'Quotes', fields: [
+                        CreateField('Subject', 'Quote Details', required: true),
+                        CreateField('Quote Stage', 'Quote Details',
+                            type: FieldType.select,
+                            options: [
+                              'Created',
+                              'Delivered',
+                              'Reviewed',
+                              'Accepted',
+                              'Rejected'
+                            ]),
+                        CreateField('Valid Until', 'Quote Details',
+                            type: FieldType.date),
+                        CreateField('Description', 'Description',
+                            type: FieldType.multiline),
+                      ])));
+          if (created == true) _fetch();
+        },
         child: const Icon(Icons.add),
       ),
     );

@@ -8,6 +8,9 @@ import '../widgets/common.dart';
 
 import 'module_create_screen.dart';
 import 'tasks_screen.dart';
+import 'maps_screen.dart';
+import 'scan_business_card.dart';
+import 'search_screen.dart';
 
 /// Dashboard: greeting, Quick Create, Overview, Pipeline, Today's agenda.
 /// All figures come from the `/dashboard` API (with events for the agenda);
@@ -185,7 +188,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
-                IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+                IconButton(
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SearchScreen())),
+                    icon: const Icon(Icons.search)),
               ],
             ),
           ),
@@ -196,7 +204,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _ActionTile(
-                      icon: Icons.map_outlined, label: 'Map', onTap: () {}),
+                      icon: Icons.map_outlined,
+                      label: 'Map',
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const MapsScreen()))),
                 ),
               ),
               Expanded(
@@ -205,7 +218,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: _ActionTile(
                       icon: Icons.qr_code_scanner,
                       label: 'Scan Business Card',
-                      onTap: () {}),
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ScanBusinessCardScreen()))),
                 ),
               ),
             ],
