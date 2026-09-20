@@ -8,5 +8,6 @@ class ActionsScreen extends StatelessWidget {
   Widget build(BuildContext context) => const ModuleListScreen(
         title: 'Actions',
         module: 'Activities',
+        showFABPlus: false,
       );
 }

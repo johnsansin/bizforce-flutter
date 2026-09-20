@@ -48,7 +48,9 @@ class _EventsScreenState extends State<EventsScreen> {
     });
     final api = context.read<AppState>().api;
     try {
-      final records = await api.records('Events');
+      final from = DateTime(_shown.year, _shown.month, 1);
+      final to = DateTime(_shown.year, _shown.month + 1, 1);
+      final records = await api.records('Events', from: from, to: to);
       if (!mounted) return;
       setState(() {
         _agenda = eventItemsFrom(records);
@@ -69,10 +71,15 @@ class _EventsScreenState extends State<EventsScreen> {
     }
   }
 
-  void _prevMonth() =>
-      setState(() => _shown = DateTime(_shown.year, _shown.month - 1, 1));
-  void _nextMonth() =>
-      setState(() => _shown = DateTime(_shown.year, _shown.month + 1, 1));
+  void _prevMonth() {
+    setState(() => _shown = DateTime(_shown.year, _shown.month - 1, 1));
+    _fetch();
+  }
+
+  void _nextMonth() {
+    setState(() => _shown = DateTime(_shown.year, _shown.month + 1, 1));
+    _fetch();
+  }
 
   @override
   Widget build(BuildContext context) {

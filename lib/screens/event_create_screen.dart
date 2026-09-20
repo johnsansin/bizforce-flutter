@@ -43,13 +43,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final api = context.read<AppState>().api;
     try {
       await api.createRecord('Events', {
-        'Subject': _name.text.trim(),
+        'title': _name.text.trim(),
+        'subject': _name.text.trim(),
         'assignedTo': _assignedTo,
         'status': _status,
         'activityType': _activityType,
         'agenda': _agenda.text.trim(),
-        'startDate': _todayIso(),
-        'endDate': _todayIso(),
+        'start': _start.toUtc().toIso8601String(),
+        'end': _end.toUtc().toIso8601String(),
+        'startDate': _start.toUtc().toIso8601String(),
+        'endDate': _end.toUtc().toIso8601String(),
       });
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -62,11 +65,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to reach the server.')));
     }
-  }
-
-  String _todayIso() {
-    final d = DateTime.now();
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
   @override

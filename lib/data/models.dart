@@ -13,7 +13,9 @@ CrmRecord crmRecordFromJson(String module, Map<dynamic, dynamic> m) {
   final first = '${m['firstname'] ?? ''}';
   final last = '${m['lastname'] ?? ''}';
   final full = [first, last].where((s) => s.isNotEmpty).join(' ');
-  final name = ('${m['label'] ?? ''}'.isEmpty ? full : '${m['label']}').trim();
+  final explicitName = m['label'] ?? m['title'] ?? m['subject'] ?? m['name'];
+  final name =
+      ('${explicitName ?? ''}'.isEmpty ? full : '$explicitName').trim();
   final fields = <String, String>{};
   m.forEach((k, v) {
     final key = '$k';
@@ -214,6 +216,8 @@ class TimelogEntry {
 DateTime? parseCrmDateTime(String raw) {
   final s = raw.trim();
   if (s.isEmpty) return null;
+  final iso = DateTime.tryParse(s);
+  if (iso != null) return iso.toLocal();
   final asInt = int.tryParse(s);
   if (asInt != null) return DateTime.fromMillisecondsSinceEpoch(asInt);
   final space = s.replaceAll('T', ' ').trim();

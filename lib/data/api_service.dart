@@ -178,18 +178,35 @@ class ApiService {
   /// Fetches a module's records: GET /<Module>?search=&page=&per_page=.
   /// Returns an empty list when the API has no records for the module.
   Future<List<CrmRecord>> records(String module,
-      {String? search, int page = 1, int perPage = 100}) async {
-    final data = await request('/$module', query: {
+      {String? search,
+      int page = 1,
+      int perPage = 100,
+      DateTime? from,
+      DateTime? to}) async {
+    final isCalendar = module == 'Events' || module == 'Activities';
+    final path = isCalendar ? '/calendar' : '/${module.toLowerCase()}';
+    final data = await request(path, query: {
       if (search != null && search.isNotEmpty) 'search': search,
       'page': '$page',
       'per_page': '$perPage',
+      if (isCalendar)
+        'from': (from ?? DateTime.now().subtract(const Duration(days: 365)))
+            .toUtc()
+            .toIso8601String(),
+      if (isCalendar)
+        'to': (to ?? DateTime.now().add(const Duration(days: 365)))
+            .toUtc()
+            .toIso8601String(),
     });
     return _parsedRecords(module, data);
   }
 
   /// Creates a record in a module (Lead, Contact, Task, ...).
   Future<void> createRecord(String module, Map<String, dynamic> fields) async {
-    await request('/$module', method: ApiMethod.post, body: {
+    final path = module == 'Events' || module == 'Activities'
+        ? '/calendar'
+        : '/${module.toLowerCase()}';
+    await request(path, method: ApiMethod.post, body: {
       'module': module,
       ...fields,
     });
@@ -198,12 +215,18 @@ class ApiService {
   /// Updates an existing record.
   Future<void> updateRecord(
       String module, String id, Map<String, dynamic> fields) async {
-    await request('/$module/$id', method: ApiMethod.put, body: fields);
+    final path = module == 'Events' || module == 'Activities'
+        ? '/calendar/$id'
+        : '/${module.toLowerCase()}/$id';
+    await request(path, method: ApiMethod.put, body: fields);
   }
 
   /// Deletes an existing record.
   Future<void> deleteRecord(String module, String id) async {
-    await request('/$module/$id', method: ApiMethod.delete);
+    final path = module == 'Events' || module == 'Activities'
+        ? '/calendar/$id'
+        : '/${module.toLowerCase()}/$id';
+    await request(path, method: ApiMethod.delete);
   }
 
   // --------------------------------------------------------------- summary
@@ -235,13 +258,21 @@ class ApiService {
     if (data is! Map && data is! List) return const [];
     dynamic list = data;
     if (data is Map) {
-      dynamic result =
-          data['result'] ?? data['records'] ?? data['data'] ?? data['items'];
+      dynamic result = data['result'] ??
+          data['records'] ??
+          data['data'] ??
+          data['items'] ??
+          data['events'] ??
+          data['activities'];
       if (result is Map && result['records'] is List)
         result = result['records'];
       if (result is Map && result['data'] is List) result = result['data'];
       if (result is Map && result['entities'] is List)
         result = result['entities'];
+      if (result is Map && result['events'] is List) result = result['events'];
+      if (result is Map && result['activities'] is List)
+        result = result['activities'];
+      if (result is Map && result['items'] is List) result = result['items'];
       result ??= data['result'];
       list = result;
       if (list is! List) list = [];
