@@ -119,11 +119,11 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
       floatingActionButton: widget.showFABPlus
           ? FloatingActionButton(
               onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              CreateRecordScreen(module: widget.module)))
-                  .then((saved) {
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => CreateRecordScreen(
+                          module: widget.module,
+                          fields: _createFields(widget.module)))).then((saved) {
                 if (saved == true) _fetch();
               }),
               child: const Icon(Icons.add),
@@ -176,6 +176,42 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
         },
       ),
     );
+  }
+
+  List<CreateField> _createFields(String module) {
+    final key = module.toLowerCase();
+    if (key == 'leads' || key == 'contacts') {
+      return const [
+        CreateField('First Name', 'Basic Information'),
+        CreateField('Last Name', 'Basic Information', required: true),
+        CreateField('Email', 'Basic Information', type: FieldType.email),
+        CreateField('Phone', 'Basic Information', type: FieldType.phone),
+        CreateField('Organization Name', 'Basic Information'),
+        CreateField('Description', 'Description', type: FieldType.multiline),
+      ];
+    }
+    if (key == 'deals') {
+      return const [
+        CreateField('Name', 'Deal Details', required: true),
+        CreateField('Amount', 'Deal Details'),
+        CreateField('Sales Stage', 'Deal Details',
+            type: FieldType.select,
+            options: [
+              'Prospecting',
+              'Qualification',
+              'Proposal',
+              'Negotiation',
+              'Closed Won',
+              'Closed Lost'
+            ]),
+        CreateField('Description', 'Description', type: FieldType.multiline),
+      ];
+    }
+    return const [
+      CreateField('Name', 'Basic Information', required: true),
+      CreateField('Status', 'Basic Information'),
+      CreateField('Description', 'Description', type: FieldType.multiline),
+    ];
   }
 
   void _openDetail(CrmRecord record) {

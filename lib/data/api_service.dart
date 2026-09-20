@@ -51,6 +51,31 @@ class ApiService {
     if (token != null) _token = token;
   }
 
+  String _moduleSlug(String module) {
+    final key = module.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    const aliases = <String, String>{
+      'deals': 'potentials',
+      'opportunities': 'potentials',
+      'organizations': 'accounts',
+      'phonecalls': 'calllogs',
+      'events': 'calendar',
+      'activities': 'calendar',
+    };
+    return aliases[key] ?? key;
+  }
+
+  String _fieldKey(String label) {
+    final words = label
+        .trim()
+        .split(RegExp(r'[^A-Za-z0-9]+'))
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return label;
+    final first = words.first[0].toLowerCase() + words.first.substring(1);
+    return first +
+        words.skip(1).map((w) => w[0].toUpperCase() + w.substring(1)).join();
+  }
+
   /// Core HTTP helper shared by every endpoint.
   Future<dynamic> request(
     String path, {
@@ -184,7 +209,7 @@ class ApiService {
       DateTime? from,
       DateTime? to}) async {
     final isCalendar = module == 'Events' || module == 'Activities';
-    final path = isCalendar ? '/calendar' : '/${module.toLowerCase()}';
+    final path = '/${_moduleSlug(module)}';
     final data = await request(path, query: {
       if (search != null && search.isNotEmpty) 'search': search,
       'page': '$page',
@@ -205,10 +230,9 @@ class ApiService {
   Future<void> createRecord(String module, Map<String, dynamic> fields) async {
     final path = module == 'Events' || module == 'Activities'
         ? '/calendar'
-        : '/${module.toLowerCase()}';
+        : '/${_moduleSlug(module)}';
     await request(path, method: ApiMethod.post, body: {
-      'module': module,
-      ...fields,
+      ...fields.map((key, value) => MapEntry(_fieldKey(key), value)),
     });
   }
 
@@ -217,7 +241,7 @@ class ApiService {
       String module, String id, Map<String, dynamic> fields) async {
     final path = module == 'Events' || module == 'Activities'
         ? '/calendar/$id'
-        : '/${module.toLowerCase()}/$id';
+        : '/${_moduleSlug(module)}/$id';
     await request(path, method: ApiMethod.put, body: fields);
   }
 
@@ -225,7 +249,7 @@ class ApiService {
   Future<void> deleteRecord(String module, String id) async {
     final path = module == 'Events' || module == 'Activities'
         ? '/calendar/$id'
-        : '/${module.toLowerCase()}/$id';
+        : '/${_moduleSlug(module)}/$id';
     await request(path, method: ApiMethod.delete);
   }
 
