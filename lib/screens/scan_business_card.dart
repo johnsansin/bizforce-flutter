@@ -37,7 +37,18 @@ class _ScanBusinessCardScreenState extends State<ScanBusinessCardScreen> {
   }
 
   Future<void> _save() async {
-    if (_firstName.text.trim().isEmpty && _email.text.trim().isEmpty) {
+    final isLead = widget.module.toLowerCase() == 'leads';
+    if (isLead &&
+        (_firstName.text.trim().isEmpty ||
+            _lastName.text.trim().isEmpty ||
+            _organization.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('First name, last name and company are required')));
+      return;
+    }
+    if (!isLead &&
+        _firstName.text.trim().isEmpty &&
+        _email.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enter at least a name or email')));
       return;
@@ -48,7 +59,10 @@ class _ScanBusinessCardScreenState extends State<ScanBusinessCardScreen> {
       await api.createRecord(widget.module, {
         'firstName': _firstName.text.trim(),
         'lastName': _lastName.text.trim(),
-        'organization': _organization.text.trim(),
+        if (widget.module.toLowerCase() == 'leads')
+          'company': _organization.text.trim()
+        else
+          'organizationName': _organization.text.trim(),
         'phone': _officePhone.text.trim(),
         'mobile': _mobilePhone.text.trim(),
         'email': _email.text.trim(),
@@ -138,7 +152,9 @@ class _ScanBusinessCardScreenState extends State<ScanBusinessCardScreen> {
                         child: AppTextField(
                             controller: _lastName, hint: 'Enter Last Name')),
                     LabeledField(
-                        label: 'Organization Name',
+                        label: widget.module.toLowerCase() == 'leads'
+                            ? 'Company'
+                            : 'Organization Name',
                         child: AppTextField(
                             controller: _organization,
                             hint: 'Enter Organization')),

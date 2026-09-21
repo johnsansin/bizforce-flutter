@@ -10,8 +10,8 @@ import 'package:flutter/material.dart';
 /// detail screen always renders something meaningful.
 CrmRecord crmRecordFromJson(String module, Map<dynamic, dynamic> m) {
   final id = '${m['id'] ?? ''}';
-  final first = '${m['firstname'] ?? ''}';
-  final last = '${m['lastname'] ?? ''}';
+  final first = '${m['firstName'] ?? m['firstname'] ?? ''}';
+  final last = '${m['lastName'] ?? m['lastname'] ?? ''}';
   final full = [first, last].where((s) => s.isNotEmpty).join(' ');
   final explicitName = m['label'] ?? m['title'] ?? m['subject'] ?? m['name'];
   final name =
@@ -24,15 +24,24 @@ CrmRecord crmRecordFromJson(String module, Map<dynamic, dynamic> m) {
     if (value.isEmpty || value == 'null') return;
     fields[key] = value;
   });
-  final moduleName = '${m['module'] ?? module}';
+  final moduleName = module;
   return CrmRecord(
     id: id.isEmpty ? name.hashCode.toString() : id,
     name: name.isEmpty ? '(Unnamed $moduleName)' : name,
     module: moduleName,
-    subtitle:
-        fields['organizationname'] ?? fields['accountname'] ?? fields['email'],
+    subtitle: fields['company'] ??
+        fields['organizationName'] ??
+        fields['organizationname'] ??
+        fields['accountName'] ??
+        fields['accountname'] ??
+        fields['primaryEmail'] ??
+        fields['email'],
     fields: fields,
-    status: fields['leadstatus'] ?? fields['status'] ?? fields['ticketstatus'],
+    status: fields['leadStatus'] ??
+        fields['leadstatus'] ??
+        fields['status'] ??
+        fields['ticketStatus'] ??
+        fields['ticketstatus'],
   );
 }
 
@@ -62,7 +71,16 @@ class CrmRecord {
   });
 
   /// Lookup a display value for a field label, e.g. `fields['Mobile Phone']`.
-  String field(String label) => fields[label] ?? '';
+  String field(String label) {
+    final direct = fields[label];
+    if (direct != null) return direct;
+    final wanted = label.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    for (final entry in fields.entries) {
+      final key = entry.key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (key == wanted) return entry.value;
+    }
+    return '';
+  }
 
   bool get hasValue => name.isNotEmpty;
 
@@ -262,6 +280,8 @@ List<AgendaItem> eventItemsFrom(List<CrmRecord> records) {
   for (final r in records) {
     final startRaw = _fieldOf(r, const [
       'start',
+      'startAt',
+      'dueAt',
       'startdateandtime',
       'start_date',
       'date_start',
@@ -272,6 +292,7 @@ List<AgendaItem> eventItemsFrom(List<CrmRecord> records) {
     if (start == null) continue;
     final endRaw = _fieldOf(r, const [
       'end',
+      'endAt',
       'enddateandtime',
       'end_date',
       'date_end',

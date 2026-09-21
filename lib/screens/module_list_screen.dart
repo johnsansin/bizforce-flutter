@@ -164,15 +164,16 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
     }
     return RefreshIndicator(
       onRefresh: () => _fetch(search: _query),
-      child: ListView.separated(
+      child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
         itemCount: _data.length,
-        separatorBuilder: (context, index) => Divider(
-            height: 1, indent: 72, color: Theme.of(context).dividerColor),
         itemBuilder: (context, i) {
           final r = _data[i];
-          return _RecordListTile(record: r, onTap: () => _openDetail(r));
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _RecordListTile(record: r, onTap: () => _openDetail(r)),
+          );
         },
       ),
     );
@@ -180,7 +181,39 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
 
   List<CreateField> _createFields(String module) {
     final key = module.toLowerCase();
-    if (key == 'leads' || key == 'contacts') {
+    if (key == 'leads') {
+      return const [
+        CreateField('Salutation', 'Identity'),
+        CreateField('First Name', 'Identity', required: true),
+        CreateField('Last Name', 'Identity', required: true),
+        CreateField('Company', 'Identity', required: true),
+        CreateField('Title', 'Identity'),
+        CreateField('Email', 'Contact', type: FieldType.email),
+        CreateField('Secondary Email', 'Contact', type: FieldType.email),
+        CreateField('Phone', 'Contact', type: FieldType.phone),
+        CreateField('Mobile', 'Contact', type: FieldType.phone),
+        CreateField('Fax', 'Contact', type: FieldType.phone),
+        CreateField('Website', 'Contact'),
+        CreateField('Lead Source', 'Qualification'),
+        CreateField('Lead Status', 'Qualification'),
+        CreateField('Campaign Id', 'Qualification'),
+        CreateField('Industry', 'Qualification'),
+        CreateField('Annual Revenue', 'Qualification'),
+        CreateField('No Of Employees', 'Qualification'),
+        CreateField('Rating', 'Qualification'),
+        CreateField('Interest', 'Qualification'),
+        CreateField('Lead Score', 'Qualification'),
+        CreateField('Next Follow Up', 'Qualification', type: FieldType.date),
+        CreateField('Street', 'Address'),
+        CreateField('City', 'Address'),
+        CreateField('State', 'Address'),
+        CreateField('Country', 'Address'),
+        CreateField('Postal Code', 'Address'),
+        CreateField('PO Box', 'Address'),
+        CreateField('Description', 'Notes', type: FieldType.multiline),
+      ];
+    }
+    if (key == 'contacts') {
       return const [
         CreateField('First Name', 'Basic Information'),
         CreateField('Last Name', 'Basic Information', required: true),
@@ -214,17 +247,27 @@ class _ModuleListScreenState extends State<ModuleListScreen> {
     ];
   }
 
-  void _openDetail(CrmRecord record) {
-    Navigator.push(
+  Future<void> _openDetail(CrmRecord record) async {
+    CrmRecord fullRecord = record;
+    try {
+      fullRecord =
+          await context.read<AppState>().api.record(widget.module, record.id);
+    } catch (_) {
+      // Fall back to the list representation when detail loading is unavailable.
+    }
+    if (!mounted) return;
+    Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => RecordDetailScreen(
-          record: record,
-          tabs: widget.tabFactory?.call(record) ??
-              defaultRecordTabs(record: record),
+          record: fullRecord,
+          tabs: widget.tabFactory?.call(fullRecord) ??
+              defaultRecordTabs(record: fullRecord),
         ),
       ),
-    );
+    ).then((changed) {
+      if (changed == true) _fetch();
+    });
   }
 
   void _scanBusinessCard() {
@@ -249,49 +292,58 @@ class _RecordListTile extends StatelessWidget {
         record.fields['Organization Name'] ??
         record.fields['Company'] ??
         record.fields['Primary Email'];
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            RecordAvatar(record.name),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(record.name,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600)),
-                  if (subtitle != null && subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Theme.of(context).dividerColor),
+          ),
+          child: Row(
+            children: [
+              RecordAvatar(record.name),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(record.name,
                         style: const TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary)),
-                  ],
-                  if (record.rating > 0) ...[
-                    const SizedBox(height: 2),
-                    Row(children: [
-                      const Icon(Icons.stars,
-                          size: 14, color: AppColors.starGold),
-                      const SizedBox(width: 4),
-                      Text('Profile Rating ${'★' * record.rating.round()}',
+                            fontSize: 15.5, fontWeight: FontWeight.w700)),
+                    if (subtitle != null && subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary)),
-                    ]),
+                              fontSize: 13, color: AppColors.textSecondary)),
+                    ],
+                    if (record.rating > 0) ...[
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        const Icon(Icons.stars,
+                            size: 14, color: AppColors.starGold),
+                        const SizedBox(width: 4),
+                        Text('Profile Rating ${'★' * record.rating.round()}',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary)),
+                      ]),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            if (record.status != null)
-              StatusChip(record.status!, color: statusColor(record.status)),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right,
-                size: 20, color: AppColors.textHint),
-          ],
+              if (record.status != null)
+                StatusChip(record.status!, color: statusColor(record.status)),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right,
+                  size: 20, color: AppColors.textHint),
+            ],
+          ),
         ),
       ),
     );

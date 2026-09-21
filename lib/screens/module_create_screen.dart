@@ -80,14 +80,23 @@ class _CreateRecordScreenState extends State<CreateRecordScreen> {
 
   Map<String, String> _collect() => {
         for (final f in widget.fields)
-          f.label: (f.type == FieldType.select || f.type == FieldType.yesno)
-              ? (_select[f.label] ?? '')
-              : _text[f.label]!.text.trim(),
+          f.label: f.type == FieldType.date
+              ? (_dates[f.label] ?? DateTime.now()).toIso8601String()
+              : (f.type == FieldType.select || f.type == FieldType.yesno)
+                  ? (_select[f.label] ?? '')
+                  : _text[f.label]!.text.trim(),
       };
 
   Future<void> _save() async {
     final values = _collect();
-    final error = widget.validator?.call(values);
+    final missing = widget.fields
+        .where((field) =>
+            field.required && (values[field.label] ?? '').trim().isEmpty)
+        .map((field) => field.label)
+        .toList();
+    final error = missing.isNotEmpty
+        ? 'Please enter ${missing.join(', ')}'
+        : widget.validator?.call(values);
     if (error != null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));

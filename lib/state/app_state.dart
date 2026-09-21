@@ -59,7 +59,8 @@ class AppState extends ChangeNotifier {
     _keepSignedIn = prefs.getBool(_kKeepSignedIn) ?? false;
     _darkMode = prefs.getBool(_kThemeKey) ?? false;
     final token = prefs.getString(_kTokenKey);
-    _signedIn = _user.isNotEmpty && _keepSignedIn;
+    _signedIn =
+        _user.isNotEmpty && _keepSignedIn && token != null && token.isNotEmpty;
     if (token != null && token.isNotEmpty) _api.configure(token: token);
     _ready = true;
     notifyListeners();

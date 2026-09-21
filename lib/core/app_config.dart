@@ -9,7 +9,7 @@ class AppConfig {
   static const String apiBaseUrl = 'https://bizforce-crm.online/api';
 
   static const String appName = 'BizForce CRM';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.0.3';
 
   /// Human display name derived from an email, a safe fallback while the profile loads.
   static String deriveDisplayName(String email) {

@@ -136,7 +136,7 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Widget _monthHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Row(
         children: [
           Text(
@@ -157,21 +157,36 @@ class _EventsScreenState extends State<EventsScreen> {
               style:
                   const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.chevron_left, size: 22),
-            onPressed: _prevMonth,
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, size: 22),
-            onPressed: _nextMonth,
-          ),
+          _monthNav(Icons.chevron_left, _prevMonth),
+          const SizedBox(width: 6),
+          _monthNav(Icons.chevron_right, _nextMonth),
         ],
       ),
     );
   }
 
+  Widget _monthNav(IconData icon, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 20, color: AppColors.primary),
+        ),
+      ),
+    );
+  }
+
   Widget _weekDayRow(BuildContext context) {
-    const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
@@ -189,19 +204,19 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Widget _calendarGrid(BuildContext context) {
     final first = DateTime(_shown.year, _shown.month, 1);
-    final startOffset = first.weekday % 7; // Sunday start
+    final startOffset = first.weekday - 1; // Monday start
     final daysInMonth = DateTime(_shown.year, _shown.month + 1, 0).day;
     final today = _shown; // treat as "today" for display
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 7,
-          mainAxisSpacing: 4,
-          crossAxisSpacing: 4,
-          childAspectRatio: 1.1,
+          mainAxisSpacing: 6,
+          crossAxisSpacing: 6,
+          childAspectRatio: 0.82,
         ),
         itemCount: startOffset + daysInMonth,
         itemBuilder: (context, i) {
@@ -215,31 +230,50 @@ class _EventsScreenState extends State<EventsScreen> {
           final selected = _selectedDay != null && _selectedDay!.day == day;
           final isToday = today.day == day;
           return InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             onTap: () => setState(() => _selectedDay = date),
             child: Container(
               decoration: BoxDecoration(
                 color: selected
                     ? AppColors.primary
-                    : (hasEvent
-                        ? AppColors.primary.withOpacity(0.08)
+                    : (isToday
+                        ? AppColors.primary.withOpacity(0.1)
                         : Colors.transparent),
-                borderRadius: BorderRadius.circular(8),
-                border: isToday
-                    ? Border.all(color: AppColors.primary, width: 1.5)
+                borderRadius: BorderRadius.circular(12),
+                border: isToday && !selected
+                    ? Border.all(color: AppColors.primary, width: 1.4)
                     : null,
               ),
               alignment: Alignment.center,
-              child: Text(
-                '$day',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight:
-                      isToday || selected ? FontWeight.w800 : FontWeight.w500,
-                  color: selected
-                      ? Colors.white
-                      : (hasEvent ? AppColors.primary : AppColors.textPrimary),
-                ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$day',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isToday || selected
+                          ? FontWeight.w800
+                          : FontWeight.w500,
+                      color: selected
+                          ? Colors.white
+                          : (hasEvent
+                              ? AppColors.primary
+                              : AppColors.textPrimary),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? Colors.white
+                          : (hasEvent ? AppColors.primary : Colors.transparent),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ),
             ),
           );

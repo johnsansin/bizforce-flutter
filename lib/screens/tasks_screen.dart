@@ -6,9 +6,11 @@ import '../data/api_service.dart';
 import '../data/models.dart';
 import '../state/app_state.dart';
 import '../widgets/common.dart';
+import 'record_edit_screen.dart';
 
-/// Tasks landing screen: a segmented list picker ("My tasks due this week")
-/// plus the task rows with running-status chips, matching the reference.
+/// Tasks landing screen rebuilt to match the reference prototype: a
+/// Mine / Shared segmented control, a dropdown sub-filter chip, and task
+/// rows with a tick (tap to complete) and a trailing kind icon.
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
 
@@ -20,25 +22,43 @@ class _TasksScreenState extends State<TasksScreen> {
   List<CrmRecord> _tasks = [];
   bool _loading = true;
   String? _error;
-  final TextEditingController _search = TextEditingController();
-  String _query = '';
+
+  String _cat = 'mine';
+  int _sub = 0;
+  final Set<String> _doneLocal = {};
+
+  static const List<(String, String)> _mineFilters = [
+    ('this week', 'My tasks due this week'),
+    ('next week', 'My tasks due next week'),
+    ('this month', 'My tasks due this month'),
+    ('completed', 'My completed tasks'),
+    ('pending', 'My pending tasks'),
+  ];
 
   List<CrmRecord> get _filtered {
-    final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _tasks;
-    return _tasks.where((t) => t.name.toLowerCase().contains(q)).toList();
+    if (_cat == 'shared') return _tasks;
+    final key = _mineFilters[_sub].$1;
+    if (key == 'completed') {
+      return _tasks.where((t) => _isDone(t.id, t)).toList();
+    }
+    if (key == 'pending') {
+      return _tasks.where((t) => !_isDone(t.id, t)).toList();
+    }
+    return _tasks;
+  }
+
+  bool _isDone(String id, CrmRecord task) {
+    if (_doneLocal.contains(id)) return true;
+    final status = (task.status ?? task.field('Status')).toLowerCase();
+    return status.contains('complete') ||
+        status.contains('held') ||
+        status.contains('closed');
   }
 
   @override
   void initState() {
     super.initState();
     _fetch();
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
   }
 
   Future<void> _fetch() async {
@@ -71,22 +91,32 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final list = _filtered;
+    final subLabel = _mineFilters[_sub].$2;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tasks'),
       ),
       body: Column(
         children: [
-          _listPickerRow(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-            child: TextField(
-              controller: _search,
-              onChanged: (v) => setState(() => _query = v),
-              decoration: const InputDecoration(
-                  hintText: 'Search Tasks',
-                  prefixIcon: Icon(Icons.search, size: 20),
-                  isDense: true),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SegmentedControl<String>(
+                options: const [('Mine', 'mine'), ('Shared', 'shared')],
+                selected: _cat,
+                onChanged: (v) => setState(() => _cat = v),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _cat == 'mine'
+                  ? DropdownChip(subLabel, onTap: _showListPicker)
+                  : DropdownChip('All Tasks', onTap: _showListPicker, enabled: false),
             ),
           ),
           Expanded(
@@ -96,59 +126,42 @@ class _TasksScreenState extends State<TasksScreen> {
                     ? EmptyState(
                         title: 'Could not load tasks',
                         body: _error!,
-                        icon: Icons.cloud_off,
+                        icon: Icons.cloud_off_outlined,
                         action: TextButton(
                             onPressed: _fetch, child: const Text('Retry')),
                       )
-                    : _filtered.isEmpty
-                        ? const EmptyState(
-                            title: 'No tasks found',
-                            body: 'Tap + to create a new task',
-                            icon: Icons.checklist_rtl)
+                    : list.isEmpty
+                        ? EmptyState(
+                            title: _cat == 'mine'
+                                ? 'Nothing in this list'
+                                : 'No tasks found',
+                            body: 'Add a task to get started.',
+                            icon: Icons.checklist_rtl,
+                            action: FilledButton.icon(
+                              onPressed: _loading ? null : _createTask,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add a task'),
+                            ),
+                          )
                         : RefreshIndicator(
                             onRefresh: _fetch,
                             child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              itemCount: _filtered.length,
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 10, 16, 90),
+                              itemCount: list.length,
                               itemBuilder: (context, i) {
-                                final task = _filtered[i];
-                                return InkWell(
-                                  onTap: () => _openTask(task),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 12),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.check_circle_outline,
-                                            color: task.status == 'In Progress'
-                                                ? AppColors.planned
-                                                : AppColors.textHint),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(task.name,
-                                                  style: const TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.w600)),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                  'Task Type · ${task.field('Task Type')}',
-                                                  style: const TextStyle(
-                                                      fontSize: 13,
-                                                      color: AppColors
-                                                          .textSecondary)),
-                                            ],
-                                          ),
-                                        ),
-                                        StatusChip(task.status ?? '',
-                                            color: statusColor(task.status)),
-                                      ],
-                                    ),
-                                  ),
+                                final task = list[i];
+                                return _TaskRow(
+                                  task: task,
+                                  done: _isDone(task.id, task),
+                                  onOpen: () => _openTask(task),
+                                  onToggle: () => setState(() {
+                                    if (_doneLocal.contains(task.id)) {
+                                      _doneLocal.remove(task.id);
+                                    } else {
+                                      _doneLocal.add(task.id);
+                                    }
+                                  }),
                                 );
                               },
                             ),
@@ -163,62 +176,61 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
-  Widget _listPickerRow() {
-    return InkWell(
-      onTap: _showListPicker,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: const Row(
+  void _showListPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 12),
           children: [
-            Icon(Icons.assignment_outlined,
-                size: 18, color: AppColors.textSecondary),
-            SizedBox(width: 8),
-            Expanded(
-                child: Text('My tasks due this week',
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
-            Icon(Icons.keyboard_arrow_down,
-                size: 18, color: AppColors.textHint),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 10),
+              child: Text('My tasks',
+                  style:
+                      TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            ),
+            for (int i = 0; i < _mineFilters.length; i++)
+              ListTile(
+                leading: Icon(
+                    _sub == i
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    color: _sub == i
+                        ? AppColors.primary
+                        : AppColors.textSecondary),
+                title: Text(_mineFilters[i].$2,
+                    style: TextStyle(
+                        fontWeight: _sub == i ? FontWeight.w700 : null)),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() => _sub = i);
+                },
+              ),
           ],
         ),
       ),
     );
   }
 
-  void _showListPicker() {
-    const lists = [
-      'My tasks due this week',
-      'My tasks due next week',
-      'My tasks due this month',
-      'My completed tasks',
-      'My pending tasks'
-    ];
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => ListView(
-        shrinkWrap: true,
-        children: [
-          for (final l in lists)
-            ListTile(
-                leading: const Icon(Icons.check_box_outline_blank),
-                title: Text(l),
-                onTap: () => Navigator.pop(context)),
-        ],
-      ),
-    );
-  }
-
-  void _openTask(CrmRecord task) {
-    Navigator.push(
+  Future<void> _openTask(CrmRecord task) async {
+    CrmRecord fullTask = task;
+    try {
+      fullTask = await context.read<AppState>().api.record('Tasks', task.id);
+    } catch (_) {
+      // Fall back to list data if the calendar detail call is unavailable.
+    }
+    if (!mounted) return;
+    Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => TaskDetailScreen(task: task)),
-    );
+      MaterialPageRoute(builder: (_) => TaskDetailScreen(task: fullTask)),
+    ).then((changed) {
+      if (changed == true) _fetch();
+    });
   }
 
   Future<void> _createTask() async {
@@ -229,14 +241,18 @@ class _TasksScreenState extends State<TasksScreen> {
     );
     if (name == null || name.trim().isEmpty) return;
     try {
-      final now = DateTime.now();
+      final assignedId = appState.profile['id'];
       final body = {
-        'Subject': name.trim(),
-        'taskType': 'Checklist Item',
-        'status': 'Not Started',
-        'dueDate': '${FormattersDate.date(now)} ${FormattersDate.time(now)}',
-        'assignedTo':
-            appState.displayName.isEmpty ? 'Users' : appState.displayName,
+        'subject': name.trim(),
+        'activityType': 'Task',
+        'status': 'Planned',
+        'priority': 'Medium',
+        'dueAt': DateTime.now()
+            .add(const Duration(days: 1))
+            .toUtc()
+            .toIso8601String(),
+        if (assignedId != null && assignedId.isNotEmpty)
+          'assignedTo': assignedId,
       };
       await appState.api.createRecord('Tasks', body);
       if (!mounted) return;
@@ -250,6 +266,109 @@ class _TasksScreenState extends State<TasksScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Unable to reach the server.')));
     }
+  }
+}
+
+class _TaskRow extends StatelessWidget {
+  final CrmRecord task;
+  final bool done;
+  final VoidCallback onOpen;
+  final VoidCallback onToggle;
+  const _TaskRow({
+    required this.task,
+    required this.done,
+    required this.onOpen,
+    required this.onToggle,
+  });
+
+  IconData _kindIcon() {
+    final t = (task.field('Activity Type') + ' ' + (task.status ?? '')).toLowerCase();
+    if (t.contains('call')) return Icons.call_outlined;
+    if (t.contains('meet') ||
+        t.contains('event') ||
+        t.contains('onsite'))
+      return Icons.event_outlined;
+    if (t.contains('mail') || t.contains('email'))
+      return Icons.mail_outline;
+    if (t.contains('task') || t.contains('note') || t.contains('zoom'))
+      return Icons.description_outlined;
+    return Icons.checklist_rtl;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = task.subtitle;
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Theme.of(context).dividerColor),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: onToggle,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 24,
+                height: 24,
+                margin: const EdgeInsets.only(top: 1),
+                decoration: BoxDecoration(
+                  color: done ? AppColors.held : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(
+                      color: done ? AppColors.held : Theme.of(context).dividerColor,
+                      width: 2.2),
+                ),
+                child: done
+                    ? const Icon(Icons.check, size: 15, color: Colors.white)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(task.name,
+                      style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          decoration:
+                              done ? TextDecoration.lineThrough : null,
+                          color:
+                              done ? AppColors.textHint : null)),
+                  const SizedBox(height: 2),
+                  Text(
+                      [
+                        if (subtitle != null && subtitle.isNotEmpty) subtitle,
+                        if (task.field('Activity Type').isNotEmpty)
+                          task.field('Activity Type'),
+                        if (!done) task.status ?? ''
+                      ].where((s) => s.isNotEmpty).join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12.5, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(_kindIcon(),
+                  size: 19, color: done ? AppColors.textHint : AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -314,6 +433,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Duration _elapsed = Duration.zero;
   bool _running = false;
 
+  Future<void> _edit() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => RecordEditScreen(record: widget.task)),
+    );
+    if (saved == true && mounted) Navigator.pop(context, true);
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -349,7 +476,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tasks'),
-        actions: [],
+        actions: [
+          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: _edit),
+        ],
       ),
       body: Column(
         children: [
@@ -391,7 +520,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          StatusChip(task.status!,
+                          StatusChip(task.status ?? 'Not Started',
                               color: statusColor(task.status)),
                           const SizedBox(width: 8),
                           const StatusChip('Checklist Item',

@@ -17,6 +17,7 @@ import 'events_screen.dart';
 import 'tasks_screen.dart';
 import 'documents_screen.dart';
 import 'chat_screen.dart';
+import 'notifications_screen.dart';
 import 'search_screen.dart';
 import 'scan_business_card.dart';
 
@@ -98,6 +99,9 @@ class _HomeShellState extends State<HomeShell> {
   void _openChat() => Navigator.push(
       context, MaterialPageRoute(builder: (_) => const ChatScreen()));
 
+  void _openNotifications() => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+
   void _openSearch() => Navigator.push(
       context, MaterialPageRoute(builder: (_) => const SearchScreen()));
 
@@ -120,7 +124,7 @@ class _HomeShellState extends State<HomeShell> {
         centerTitle: false,
         backgroundColor: Theme.of(context).cardColor,
         leading: IconButton(
-          icon: const Icon(Icons.menu),
+          icon: const Icon(Icons.menu_rounded),
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         title: Padding(
@@ -131,6 +135,10 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
         actions: [
+          IconButton(
+              tooltip: 'Notifications',
+              icon: const Icon(Icons.notifications_none_rounded),
+              onPressed: _openNotifications),
           IconButton(icon: const Icon(Icons.search), onPressed: _openSearch),
           IconButton(
               icon: const Icon(Icons.chat_bubble_outline),
@@ -521,7 +529,10 @@ class _MorePage extends StatelessWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         _tile(context, Icons.person_outline, 'My Profile', () {}),
-        _tile(context, Icons.notifications_none, 'Notifications', () {}),
+        _tile(context, Icons.notifications_none, 'Notifications', () {
+          Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+        }),
         _tile(context, Icons.chat_bubble_outline, 'Chat', () {
           Navigator.push(
               context, MaterialPageRoute(builder: (_) => const ChatScreen()));

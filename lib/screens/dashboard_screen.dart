@@ -7,14 +7,15 @@ import '../state/app_state.dart';
 import '../widgets/common.dart';
 
 import 'module_create_screen.dart';
-import 'tasks_screen.dart';
 import 'maps_screen.dart';
 import 'scan_business_card.dart';
-import 'search_screen.dart';
 
-/// Dashboard: greeting, Quick Create, Overview, Pipeline, Today's agenda.
-/// All figures come from the `/dashboard` API (with events for the agenda);
-/// nothing is fabricated.
+/// Dashboard rebuilt to match the reference prototype: an eyebrow + greeting,
+/// a two-up quick-action grid (Map / Scan Business Card), a gradient hero
+/// showing the open pipeline, pipeline-by-stage bars, the overview stats,
+/// today's agenda card and a running tasks section. Every figure comes from
+/// the `/dashboard` API (with events/tasks best-effort on top); nothing is
+/// fabricated.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -28,6 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic> _raw = const {};
   List<PipelineStage> _pipeline = const [];
   List<AgendaItem> _agenda = const [];
+  List<CrmRecord> _tasks = const [];
 
   @override
   void initState() {
@@ -53,11 +55,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           agenda = eventItemsFrom(await api.records('Events'));
         } catch (_) {}
       }
+      List<CrmRecord> tasks = const [];
+      try {
+        tasks = await api.records('Tasks');
+      } catch (_) {
+        // Tasks are a best-effort dashboard section.
+      }
       if (!mounted) return;
       setState(() {
         _raw = raw;
         _pipeline = _pipelineFrom(raw);
         _agenda = agenda;
+        _tasks = tasks.take(4).toList();
         _loading = false;
       });
     } on Exception catch (e) {
@@ -144,11 +153,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             : label == 'Task'
                 ? 'Tasks'
                 : 'Events';
-    if (module == 'Tasks') {
-      Navigator.push(
-          context, MaterialPageRoute(builder: (_) => const TasksScreen()));
-      return;
-    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -160,123 +164,104 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  String _money(String raw) {
+    final v = double.tryParse(raw.replaceAll(',', '').replaceAll('Rs', '').trim());
+    if (v == null) return raw;
+    final compact = v >= 1000000
+        ? 'Rs ${_trim(v / 1000000)}M'
+        : v >= 1000
+            ? 'Rs ${_trim(v / 1000)}k'
+            : 'Rs ${_trim(v)}';
+    return compact;
+  }
+
+  String _trim(double v) {
+    final s = v.toStringAsFixed(1);
+    return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final isEvening = DateTime.now().hour >= 17 || DateTime.now().hour < 5;
     final greeting = isEvening ? 'Good evening' : 'Good morning';
+    final nameParts = appState.displayName.split(' ');
+    final firstName = nameParts.isNotEmpty ? nameParts.first : appState.displayName;
+
+    final pipelineTotal = _overview('—', const [
+      'pipelineAmount',
+      'pipeline',
+      'totalPipeline'
+    ]);
+    final revenue = _overview('—', const ['revenue', 'totalRevenue', 'closedWonAmount']);
+    final leadsCount = _overview('0', const ['leads', 'leadCount', 'leadsCount']);
+    final tickets = _overview('0', const ['openTickets', 'tickets', 'ticketCount']);
+    final openDeals = _pipeline.fold<int>(0, (s, st) => s + st.deals);
+    final closedWon = _pipeline
+        .where((st) =>
+            st.name.toLowerCase().contains('won') ||
+            st.name.toLowerCase().contains('closed'))
+        .fold<double>(0, (s, st) => s + st.amount);
+    final maxAmount =
+        _pipeline.fold<double>(0, (m, st) => st.amount > m ? st.amount : m);
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.only(bottom: 90),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         children: [
+          // ---- Greeting: eyebrow + big heading ----
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
+            padding: const EdgeInsets.only(top: 4, bottom: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                          '$greeting, ${appState.displayName.split(' ').first}',
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w800)),
-                      const Text('Your agenda, follow-ups and CRM insights',
-                          style: TextStyle(
-                              fontSize: 13, color: AppColors.textSecondary)),
-                    ],
-                  ),
-                ),
-                IconButton(
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const SearchScreen())),
-                    icon: const Icon(Icons.search)),
+                Text(_todayLabel(),
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary)),
+                const SizedBox(height: 2),
+                Text('$greeting, $firstName',
+                    style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3)),
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
+
+          // ---- Quick actions (Map / Scan Business Card) ----
           Row(
             children: [
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _ActionTile(
-                      icon: Icons.map_outlined,
-                      label: 'Map',
-                      onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const MapsScreen()))),
-                ),
+                child: _ActionTile(
+                    icon: Icons.map_outlined,
+                    label: 'Map',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const MapsScreen()))),
               ),
+              const SizedBox(width: 10),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: _ActionTile(
-                      icon: Icons.qr_code_scanner,
-                      label: 'Scan Business Card',
-                      onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const ScanBusinessCardScreen()))),
-                ),
+                child: _ActionTile(
+                    icon: Icons.qr_code_scanner,
+                    label: 'Scan Business Card',
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ScanBusinessCardScreen()))),
               ),
             ],
           ),
-          const _SectionLabel('QUICK CREATE'),
-          Row(
-            children: [
-              for (final a in const [
-                QuickAction('Lead', Icons.add),
-                QuickAction('Contact', Icons.add),
-                QuickAction('Task', Icons.add),
-                QuickAction('Meeting', Icons.add),
-              ])
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _quickCreate(context, a.label),
-                    child: Container(
-                      margin: const EdgeInsets.all(4),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border:
-                            Border.all(color: Theme.of(context).dividerColor),
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 26,
-                            height: 26,
-                            decoration: const BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle),
-                            child: const Icon(Icons.add,
-                                color: Colors.white, size: 18),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(a.label,
-                              style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const _SectionLabel('OVERVIEW'),
+
+          // ---- Sections below depend on the API state ----
           if (_loading)
             const Padding(
-                padding: EdgeInsets.all(24),
+                padding: EdgeInsets.symmetric(vertical: 48),
                 child: Center(child: CircularProgressIndicator()))
           else if (_error != null)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 children: [
                   Text(_error!,
@@ -287,100 +272,233 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             )
           else ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+            // ---- Hero: Open pipeline ----
+            HeroCard(
+              label: 'OPEN PIPELINE',
+              figure: _money(pipelineTotal),
+              subtitle:
+                  '$openDeals active deals · ${_money('$closedWon')} won this quarter',
+              bars: _pipeline.isEmpty
+                  ? null
+                  : [
+                      for (final st in _pipeline.take(4))
+                        maxAmount > 0 ? st.amount / maxAmount : 0,
+                    ],
+            ),
+            const SizedBox(height: 12),
+
+            // ---- Quick create ----
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
               child: Row(
                 children: [
-                  Expanded(
-                      child: _OverviewTile(
-                          title: 'Revenue',
-                          value: _overview('—', const [
-                            'revenue',
-                            'totalRevenue',
-                            'closedWonAmount'
-                          ]),
-                          color: AppColors.held)),
-                  Expanded(
-                      child: _OverviewTile(
-                          title: 'Leads',
-                          value: _overview(
-                              '0', const ['leads', 'leadCount', 'leadsCount']),
-                          color: AppColors.planned)),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                      child: _OverviewTile(
-                          title: 'Open Tickets',
-                          value: _overview('0',
-                              const ['openTickets', 'tickets', 'ticketCount']),
-                          color: AppColors.warning)),
-                  Expanded(
-                      child: _OverviewTile(
-                          title: 'Pipeline',
-                          value: _overview(
-                              '—', const ['pipeline', 'pipelineAmount']),
-                          color: AppColors.hot)),
-                ],
-              ),
-            ),
-            const _SectionLabel('PIPELINE'),
-            ContentCard(
-              padding: const EdgeInsets.all(14),
-              child: _pipeline.isEmpty
-                  ? const Text('No pipeline stages yet',
-                      style: TextStyle(color: AppColors.textSecondary))
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [for (final s in _pipeline) _pipeRow(s)],
+                  for (final a in const [
+                    QuickAction('Lead', Icons.add),
+                    QuickAction('Contact', Icons.add),
+                    QuickAction('Task', Icons.add),
+                    QuickAction('Meeting', Icons.add),
+                  ])
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _quickCreate(context, a.label),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 26,
+                                height: 26,
+                                decoration: const BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 18),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(a.label,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
+                ],
+              ),
             ),
-            const _SectionLabel("TODAY'S AGENDA"),
-            if (_agenda.isEmpty)
-              const ContentCard(
-                  child: Text('No events for the day',
-                      style: TextStyle(color: AppColors.textSecondary)))
+            const SizedBox(height: 12),
+
+            // ---- Pipeline by stage ----
+            if (_pipeline.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                ),
+                child: const Text('No pipeline stages yet',
+                    style:
+                        TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+              )
             else
-              for (final item in _agenda)
-                ContentCard(
-                  padding: const EdgeInsets.all(14),
+              BarChartCard(
+                title: 'PIPELINE BY STAGE',
+                entries: [
+                  for (final st in _pipeline) (st.name, st.amount),
+                ],
+                formatValue: (v) => _money('$v'),
+              ),
+            const SizedBox(height: 8),
+
+            // ---- Overview stats ----
+            const SectionHead('Overview'),
+            Row(
+              children: [
+                Expanded(
+                    child: _OverviewTile(
+                        title: 'Revenue',
+                        value: _money(revenue),
+                        color: AppColors.held)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: _OverviewTile(
+                        title: 'Leads',
+                        value: leadsCount,
+                        color: AppColors.planned)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                    child: _OverviewTile(
+                        title: 'Open Tickets',
+                        value: tickets,
+                        color: AppColors.warning)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: _OverviewTile(
+                        title: 'Pipeline',
+                        value: _money(pipelineTotal),
+                        color: AppColors.hot)),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // ---- Today's agenda card ----
+            const SectionHead('Today'),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_todayLabel(),
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary)),
+                  const SizedBox(height: 10),
+                  if (_agenda.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 6),
+                      child: Text('Nothing scheduled today.',
+                          style: TextStyle(
+                              fontSize: 13.5, color: AppColors.textHint)),
+                    )
+                  else
+                    for (final item in _agenda)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            TintedIconBox(
+                                _activityIcon(item.type),
+                                color: _activityColor(item.type),
+                                size: 38),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                      '${formatHour(item.start)} ${formatAmPm(item.start)} · ${item.type}',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // ---- Tasks ----
+            const SectionHead('Tasks'),
+            if (_tasks.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('No tasks to show yet.',
+                    style:
+                        TextStyle(fontSize: 13.5, color: AppColors.textHint)),
+              )
+            else
+              for (final task in _tasks)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                  ),
                   child: Row(
                     children: [
-                      SizedBox(
-                        width: 52,
-                        child: Column(
-                          children: [
-                            Text(formatHour(item.start),
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.w800)),
-                            Text(formatAmPm(item.start),
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary)),
-                          ],
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: Theme.of(context).dividerColor,
+                              width: 2),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.title,
-                                style: const TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 2),
-                            Text(item.type,
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary)),
-                          ],
-                        ),
+                        child: Text(task.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
                       ),
-                      StatusChip(item.status, color: statusColor(item.status)),
+                      if (task.status != null)
+                        StatusChip(task.status!,
+                            color: statusColor(task.status)),
                     ],
                   ),
                 ),
@@ -388,6 +506,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
+  String _todayLabel() {
+    final now = DateTime.now();
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
+  }
+
+  IconData _activityIcon(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('call')) return Icons.call_outlined;
+    if (t.contains('mail') || t.contains('email'))
+      return Icons.mail_outline;
+    if (t.contains('meet')) return Icons.people_outline;
+    if (t.contains('task') || t.contains('note'))
+      return Icons.description_outlined;
+    return Icons.event_outlined;
+  }
+
+  Color _activityColor(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('call')) return AppColors.held;
+    if (t.contains('mail') || t.contains('email')) return AppColors.planned;
+    if (t.contains('meet')) return AppColors.hot;
+    return AppColors.info;
   }
 }
 
@@ -404,29 +569,34 @@ List<CreateField> fieldSpecFor(String module) {
   switch (module) {
     case 'Leads':
       return const [
-        CreateField('Salutation', 'Lead Details',
-            type: FieldType.select, options: ['Mr.', 'Ms.', 'Mrs.', 'Dr.']),
-        CreateField('First Name', 'Lead Details', required: true),
-        CreateField('Last Name', 'Lead Details', required: true),
-        CreateField('Company', 'Lead Details', required: true),
-        CreateField('Primary Email', 'Lead Details', type: FieldType.email),
-        CreateField('Office Phone', 'Lead Details', type: FieldType.phone),
-        CreateField('Mobile Phone', 'Lead Details', type: FieldType.phone),
-        CreateField('Designation', 'Lead Details',
-            type: FieldType.select,
-            options: ['CEO', 'Manager', 'Owner', 'Sales Executive']),
-        CreateField('Country', 'Address Details',
-            type: FieldType.select,
-            options: ['Pakistan', 'India', 'UAE', 'USA']),
-        CreateField('Street', 'Address Details'),
-        CreateField('PO Box', 'Address Details'),
-        CreateField('Postal Code', 'Address Details'),
-        CreateField('City', 'Address Details'),
-        CreateField('State', 'Address Details',
-            type: FieldType.select,
-            options: ['Punjab', 'Sindh', 'KPK', 'Balochistan']),
-        CreateField('Description', 'Description Details',
-            type: FieldType.multiline),
+        CreateField('Salutation', 'Identity'),
+        CreateField('First Name', 'Identity', required: true),
+        CreateField('Last Name', 'Identity', required: true),
+        CreateField('Company', 'Identity', required: true),
+        CreateField('Title', 'Identity'),
+        CreateField('Email', 'Contact', type: FieldType.email),
+        CreateField('Secondary Email', 'Contact', type: FieldType.email),
+        CreateField('Phone', 'Contact', type: FieldType.phone),
+        CreateField('Mobile', 'Contact', type: FieldType.phone),
+        CreateField('Fax', 'Contact', type: FieldType.phone),
+        CreateField('Website', 'Contact'),
+        CreateField('Lead Source', 'Qualification'),
+        CreateField('Lead Status', 'Qualification'),
+        CreateField('Campaign Id', 'Qualification'),
+        CreateField('Industry', 'Qualification'),
+        CreateField('Annual Revenue', 'Qualification'),
+        CreateField('No Of Employees', 'Qualification'),
+        CreateField('Rating', 'Qualification'),
+        CreateField('Interest', 'Qualification'),
+        CreateField('Lead Score', 'Qualification'),
+        CreateField('Next Follow Up', 'Qualification', type: FieldType.date),
+        CreateField('Street', 'Address'),
+        CreateField('City', 'Address'),
+        CreateField('State', 'Address'),
+        CreateField('Country', 'Address'),
+        CreateField('Postal Code', 'Address'),
+        CreateField('PO Box', 'Address'),
+        CreateField('Description', 'Notes', type: FieldType.multiline),
       ];
     case 'Contacts':
       return const [
@@ -489,18 +659,26 @@ class _ActionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.primary, size: 24),
-            const SizedBox(height: 6),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(height: 8),
             Text(label,
                 textAlign: TextAlign.center,
                 style:
@@ -508,23 +686,6 @@ class _ActionTile extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
-              color: Theme.of(context).colorScheme.onSurfaceVariant)),
     );
   }
 }
@@ -539,17 +700,18 @@ class _OverviewTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(4),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w800, color: color)),
           const SizedBox(height: 4),
@@ -560,29 +722,4 @@ class _OverviewTile extends StatelessWidget {
       ),
     );
   }
-}
-
-Widget _pipeRow(PipelineStage stage) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(stage.name, style: const TextStyle(fontSize: 14)),
-        ),
-        Text('${stage.deals} deals',
-            style:
-                const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 90,
-          child: LinearProgressIndicator(
-            value: stage.amount > 0 ? (stage.amount / 50).clamp(0.0, 1.0) : 0,
-            minHeight: 6,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-      ],
-    ),
-  );
 }
